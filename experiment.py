@@ -158,7 +158,7 @@ if __name__ == '__main__':
     image_dict = load()
     sigma_list = [15, 25, 50]
 
-    for size in [64]:
+    for size in image_dict:
         images = list(map(lambda img: img.image, image_dict[size]))
         for sigma in sigma_list:
             noisy_list = awgn(images, sigma)
