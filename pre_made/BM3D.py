@@ -240,8 +240,9 @@ def second_3d_filtering(similar_blocks, noisy_blocks, s):
             dct = cv2.dct(similar_blocks[:, i, j])
             norm = np.dot(np.transpose(dct), dct)
             weight = norm / (norm + s ** 2)
-            if weight != 0:
-                wiener_weight[i, j] = 1 / (weight ** 2 * s ** 2)
+            if weight == 0:
+                weight += np.finfo(float).eps
+            wiener_weight[i, j] = 1 / (weight ** 2 * s ** 2)
 
             noisy_dct = cv2.dct(noisy_blocks[:, i, j]) * weight
             similar_blocks[:, i, j] = cv2.idct(noisy_dct)[0]
