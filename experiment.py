@@ -124,8 +124,9 @@ def improved_fourier(images, noisy_list, sigma_list, show=False):
         for sigma in sigma_list:
             bm3d_img = bm3d_lib(noisy / 255, sigma / 255)
             temp = psnr(image, bm3d_img)
-            cv2.imshow('Test', bm3d_img)
-            cv2.waitKey(0)
+            if show:
+                cv2.imshow('Test', bm3d_img)
+                cv2.waitKey(0)
             if temp > bm3d_psnr:
                 bm3d_psnr = temp
                 b_img = bm3d_img
