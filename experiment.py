@@ -16,6 +16,7 @@ class Image:
     def __init__(self, img, fname):
         self.image = img
         self.filename = fname.split('.')[0].split('_')[1]
+        self.size = fname.split('.')[0].split('_')[0]
 # =====================================
 
 
@@ -57,6 +58,7 @@ def classical_exp(images, noisy_list, show=False):
     assert(len(images) == len(noisy_list))
 
     result = []
+    result_images = []
 
     for i in range(len(images)):
         image = images[i]
@@ -78,6 +80,7 @@ def classical_exp(images, noisy_list, show=False):
             psnr(image, fb)
         ]
         result.append(result_by_image)
+        result_images.append([gd, gs, gc, fd, fb])
 
         if show:
             cv2.imshow('Test', gd)
@@ -91,28 +94,31 @@ def classical_exp(images, noisy_list, show=False):
             cv2.imshow('Test', fb)
             cv2.waitKey(0)
 
-    return result
+    return result, result_images
 
 
 def improved_fourier(images, noisy_list, show=False):
     assert (len(images) == len(noisy_list))
 
     result = []
+    result_images = []
 
     for i in range(len(images)):
         result_by_image = []
         image = images[i]
         noisy = noisy_list[i]
-        w_psnr = []
+        w_psnr = 0
+        w_image = None
         for k in range(1, 10):
             wiener = wiener_filter(noisy, k)
-            w_psnr.append(psnr(image, wiener))
-            if show:
-                cv2.imshow('Test', wiener)
-                cv2.waitKey(0)
-        result_by_image.append(max(w_psnr))
+            temp = psnr(image, wiener)
+            if temp > w_psnr:
+                w_psnr = temp
+                w_image = wiener
+        result_by_image.append(w_psnr)
 
-        bm3d_psnr = []
+        bm3d_psnr = 0
+        b_img = None
 
         block_size = [4, 8, 16, 32]
         beta_kaiser = [1.0, 2.0, 4.0, 8.0]
@@ -145,12 +151,17 @@ def improved_fourier(images, noisy_list, show=False):
             }
 
             bm3d_img = bm3d(noisy / 255, first_params, second_params, sigma)
-            bm3d_psnr.append(psnr(image, bm3d_img))
-        result_by_image.append(max(bm3d_psnr))
+            temp = psnr(image, bm3d_img)
+            if temp > bm3d_psnr:
+                bm3d_psnr = temp
+                b_img = bm3d_img
+
+        result_by_image.append(bm3d_psnr)
 
         result.append(result_by_image)
+        result_images.append([w_image, b_img])
 
-    return result
+    return result, result_images
 # =====================================
 
 
@@ -158,16 +169,27 @@ if __name__ == '__main__':
     image_dict = load()
     sigma_list = [15, 25, 50]
 
+    if not os.path.exists('result'):
+        os.mkdir('result')
+
+    if not os.path.exists('experiments'):
+        os.mkdir('experiments')
+
+    header = 'gaussian,sobel,canny,fourier,butterworth,wiener,bm3d'
+    header_list = header.split(',')
+
     for size in image_dict:
         images = list(map(lambda img: img.image, image_dict[size]))
         for sigma in sigma_list:
             noisy_list = awgn(images, sigma)
-            classical_results = classical_exp(images, noisy_list)
-            extended_results = improved_fourier(images, noisy_list)
+            classical_results, classical_imgs = classical_exp(images, noisy_list)
+            extended_results, extended_imgs = improved_fourier(images, noisy_list)
 
             results = []
+            result_images = []
             for i in range(len(images)):
                 results.append(classical_results[i] + extended_results[i])
+                result_images.append(classical_imgs[i] + extended_imgs[i])
 
             with open(f'./experiments/{size:03d}_{sigma}.csv', 'w') as f:
                 f.write('image,gaussian,sobel,canny,fourier,butterworth,wiener,bm3d\n')
@@ -177,3 +199,5 @@ if __name__ == '__main__':
                     result_str = ','.join(map(str, result))
                     f.write(f'{fname},{result_str}\n')
 
+                    for j, img in enumerate(result_images[i]):
+                        cv2.imwrite(f'./result/{size:03d}_{sigma}_{header_list[j]}_{fname}.png', img)
