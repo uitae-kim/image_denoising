@@ -2,6 +2,7 @@ from gaussian_noise import add_gaussian
 from classical_denoising import gaussian_denoising, gaussian_sobel, gaussian_canny, fourier_denoising, fourier_butterworth
 from wiener import wiener_filter
 from pre_made.BM3D import bm3d
+from bm3d_lib import bm3d_lib
 import numpy as np
 import cv2
 import cProfile
@@ -120,38 +121,12 @@ def improved_fourier(images, noisy_list, show=False):
         bm3d_psnr = 0
         b_img = None
 
-        block_size = [4, 8, 16, 32]
-        beta_kaiser = [1.0, 2.0, 4.0, 8.0]
-        first_thres_bm = [1000, 2000, 3000, 4000]
-        second_thres_bm = [1000, 2000, 3000, 4000]
         sigma_list = [10, 25, 50]
-
-        chain = itertools.chain(itertools.product(block_size, beta_kaiser, first_thres_bm, second_thres_bm, sigma_list))
-
-        for c in chain:
-            sigma = c[4]
-            first_params = {
-                'block_size': c[0],
-                'block_step': 3,
-                'beta_kaiser': c[1],
-                'search_step': 3,
-                'threshold_bm': c[2],
-                'max_matches': 16,
-                'window_size': 32,
-                'threshold_3d': 2.7 * sigma
-            }
-
-            second_params = {
-                'block_size': c[0],
-                'block_step': 3,
-                'search_step': 3,
-                'threshold_bm': c[3],
-                'max_matches': 32,
-                'window_size': 32
-            }
-
-            bm3d_img = bm3d(noisy / 255, first_params, second_params, sigma)
+        for sigma in sigma_list:
+            bm3d_img = bm3d_lib(noisy / 255, sigma / 255)
             temp = psnr(image, bm3d_img)
+            cv2.imshow('Test', bm3d_img)
+            cv2.waitKey(0)
             if temp > bm3d_psnr:
                 bm3d_psnr = temp
                 b_img = bm3d_img
