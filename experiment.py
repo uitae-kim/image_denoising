@@ -98,7 +98,7 @@ def classical_exp(images, noisy_list, show=False):
     return result, result_images
 
 
-def improved_fourier(images, noisy_list, show=False):
+def improved_fourier(images, noisy_list, sigma_list, show=False):
     assert (len(images) == len(noisy_list))
 
     result = []
@@ -121,7 +121,6 @@ def improved_fourier(images, noisy_list, show=False):
         bm3d_psnr = 0
         b_img = None
 
-        sigma_list = [10, 25, 50]
         for sigma in sigma_list:
             bm3d_img = bm3d_lib(noisy / 255, sigma / 255)
             temp = psnr(image, bm3d_img)
@@ -158,7 +157,7 @@ if __name__ == '__main__':
         for sigma in sigma_list:
             noisy_list = awgn(images, sigma)
             classical_results, classical_imgs = classical_exp(images, noisy_list)
-            extended_results, extended_imgs = improved_fourier(images, noisy_list)
+            extended_results, extended_imgs = improved_fourier(images, noisy_list, sigma_list)
 
             results = []
             result_images = []
