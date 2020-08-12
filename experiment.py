@@ -9,6 +9,9 @@ import cProfile
 from metric import psnr
 import os
 import itertools
+import io
+import pstats
+from pstats import SortKey
 
 
 # =====================================
@@ -140,8 +143,51 @@ def improved_fourier(images, noisy_list, sigma_list, show=False):
 # =====================================
 
 
+# =====================================
+# compute experiments
+def _compute_internal(func, iter=10):
+    pr = cProfile.Profile()
+    pr.enable()
+    for _ in range(iter):
+        func()
+    pr.disable()
+    s = io.StringIO()
+    sortby = SortKey.CUMULATIVE
+    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+    ps.print_stats()
+
+    return ps.total_tt / iter
+
+
+def compute_experiment(header, noisy, sigma):
+    median = np.median(noisy)
+    lower = int(max(0, median * 0.7))
+    upper = int(min(255, median * 1.3))
+
+    # classical
+    functions = [
+        lambda: gaussian_denoising(noisy),
+        lambda: gaussian_sobel(noisy),
+        lambda: gaussian_canny(noisy, t1=lower, t2=upper),
+        lambda: fourier_denoising(noisy),
+        lambda: fourier_butterworth(noisy),
+        lambda: wiener_filter(noisy, 5),
+        lambda: bm3d_lib(noisy / 255, sigma / 255),
+    ]
+
+    result = ''
+    for i, func in enumerate(functions):
+        result += header[i] + ','
+        val = _compute_internal(func)
+        result += f'{val:.6f}\n'
+
+    return result
+# =====================================
+
+
 if __name__ == '__main__':
     image_dict = load()
+    is_computing_experiment = True
     sigma_list = [15, 25, 50]
 
     if not os.path.exists('result'):
@@ -153,26 +199,38 @@ if __name__ == '__main__':
     header = 'gaussian,sobel,canny,fourier,butterworth,wiener,bm3d'
     header_list = header.split(',')
 
-    for size in image_dict:
-        images = list(map(lambda img: img.image, image_dict[size]))
-        for sigma in sigma_list:
-            noisy_list = awgn(images, sigma)
-            classical_results, classical_imgs = classical_exp(images, noisy_list)
-            extended_results, extended_imgs = improved_fourier(images, noisy_list, sigma_list)
+    if is_computing_experiment:
+        size = 512
+        sigma = 15
+        image = image_dict[size][5].image
+        noisy = awgn([image], sigma)[0]
 
-            results = []
-            result_images = []
-            for i in range(len(images)):
-                results.append(classical_results[i] + extended_results[i])
-                result_images.append(classical_imgs[i] + extended_imgs[i])
+        result = compute_experiment(header_list, noisy, sigma)
+        print(result)
 
-            with open(f'./experiments/{size:03d}_{sigma}.csv', 'w') as f:
-                f.write('image,gaussian,sobel,canny,fourier,butterworth,wiener,bm3d\n')
+        with open('./experiments/compute_result.csv', 'w') as f:
+            f.write(result)
+    else:
+        for size in image_dict:
+            images = list(map(lambda img: img.image, image_dict[size]))
+            for sigma in sigma_list:
+                noisy_list = awgn(images, sigma)
+                classical_results, classical_imgs = classical_exp(images, noisy_list)
+                extended_results, extended_imgs = improved_fourier(images, noisy_list, sigma_list)
 
-                for i, result in enumerate(results):
-                    fname = image_dict[size][i].filename
-                    result_str = ','.join(map(str, result))
-                    f.write(f'{fname},{result_str}\n')
+                results = []
+                result_images = []
+                for i in range(len(images)):
+                    results.append(classical_results[i] + extended_results[i])
+                    result_images.append(classical_imgs[i] + extended_imgs[i])
 
-                    for j, img in enumerate(result_images[i]):
-                        cv2.imwrite(f'./result/{size:03d}_{sigma}_{header_list[j]}_{fname}.png', img)
+                with open(f'./experiments/{size:03d}_{sigma}.csv', 'w') as f:
+                    f.write('image,gaussian,sobel,canny,fourier,butterworth,wiener,bm3d\n')
+
+                    for i, result in enumerate(results):
+                        fname = image_dict[size][i].filename
+                        result_str = ','.join(map(str, result))
+                        f.write(f'{fname},{result_str}\n')
+
+                        for j, img in enumerate(result_images[i]):
+                            cv2.imwrite(f'./result/{size:03d}_{sigma}_{header_list[j]}_{fname}.png', img)

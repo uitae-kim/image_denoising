@@ -1,0 +1,7 @@
+gaussian,0.000259
+sobel,0.012958
+canny,0.006900
+fourier,0.224181
+butterworth,1.519750
+wiener,0.048160
+bm3d,11.661713
